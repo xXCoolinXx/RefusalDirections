@@ -1,0 +1,59 @@
+#!/bin/bash
+# --- PBS Directives ---
+
+# Set the name of the job
+#PBS -N refusaldirs
+
+# Specify the queue to use
+# The queue name 'gpu_queue' is an example; replace it with the actual name on your system.
+#PBS -q gpu
+
+# Request resources: 1 node, 1 CPU, and 1 GPU
+#PBS -l select=1:ncpus=16:ngpus=1:mem=64gb
+
+# Set the maximum walltime for the job (e.g., 1 hour)
+#PBS -l walltime=04:00:00
+
+# Redirect standard output and error to files
+#PBS -o job_output.log
+#PBS -e job_error.log
+
+# --- Job Commands ---
+
+# nvidia-smi
+
+echo "Job started on $(hostname) at $(date)"
+# Navigate to the directory where the job was submitted
+cd $PBS_O_WORKDIR
+
+# Load necessary modules (e.g., CUDA, Python/PyTorch)
+# These module names are examples; they may differ on your system.
+module load anaconda
+module load cuda/12.6.0
+# conda init
+
+source $(conda info --base)/etc/profile.d/conda.sh
+conda activate /scratch/Collin/envs/backdoor # Activate your conda environment if needed
+
+# Remove stubs
+# export LD_LIBRARY_PATH=$(echo $LD_LIBRARY_PATH | sed 's|/lib64/stubs||g')
+export LD_LIBRARY_PATH=$(echo "$LD_LIBRARY_PATH" | tr ':' '\n' | grep -v "stubs" | tr '\n' ':')
+
+# Check which GPU has been allocated
+echo "GPU allocated:"
+nvidia-smi
+
+# Run your GPU-accelerated application
+echo "Running Python script..."
+
+export HF_HOME=/scratch/Collin/.cache/huggingface
+
+
+LOGFILE=$PBS_O_WORKDIR/logs/debug_$(date +%Y%m%d_%H%M%S).log
+
+{
+    python3 calc_dirs.py --model-name meta-llama/Meta-Llama-3-8B-Instruct
+} 2>&1 | tee $LOGFILE
+
+
+echo "Job finished at $(date)"
